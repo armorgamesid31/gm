@@ -1,69 +1,30 @@
-/**
- * WhatsApp Flows - n8n Bridge Gateway
- */
-
-import fetch from "node-fetch";
-
-// n8n Webhook URL'in (Production URL kullandığından emin ol)
-const N8N_URL = "https://n8n.berkai.shop/webhook/flows";
-
 export const getNextScreen = async (decryptedBody) => {
   const { screen, data, action, flow_token } = decryptedBody;
 
-  // 1. SAĞLIK KONTROLÜ (Meta'nın Ping isteği)
-  // Bu kısmı n8n'e göndermeden buradan yanıtlıyoruz ki hız kazanalım.
+  // 1. Sağlık Kontrolü (Ping)
   if (action === "ping") {
-    return {
-      data: {
-        status: "active",
-      },
-    };
+    return { data: { status: "active" } };
   }
 
-  // 2. HATA BİLDİRİMİ (Flow içinde bir hata olursa)
-  if (data?.error) {
-    console.warn("Kullanıcı ekranında hata oluştu:", data);
-    return {
-      data: {
-        acknowledged: true,
-      },
-    };
-  }
+  // 2. n8n Bağlantısı
+  const N8N_URL = "https://n8n.berkai.shop/webhook/flows";
 
-  // 3. n8n BAĞLANTISI
-  // INIT (açılış), data_exchange (buton tıkı) vb. tüm durumları n8n'e soruyoruz.
   try {
     const response = await fetch(N8N_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(decryptedBody), // WhatsApp'tan gelen tüm veriyi n8n'e pasla
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(decryptedBody),
     });
 
-    if (!response.ok) {
-        throw new Error(`n8n hatasi: ${response.statusText}`);
-    }
-
-    const n8nResult = await response.json();
-    
-    // n8n'den gelen cevabı doğrudan Meta'ya gönderiyoruz
-    return n8nResult;
+    const result = await response.json();
+    return result;
 
   } catch (error) {
-    console.error("Endpoint Köprüsü Hatası:", error);
-
-    // Bir şeyler ters giderse akışı güvenli bir şekilde kapatacak bir hata mesajı dönüyoruz
+    console.error("n8n Baglanti Hatasi:", error);
+    // Hata durumunda akışı güvenli kapat
     return {
       screen: "SUCCESS",
-      data: {
-        extension_message_response: {
-          params: {
-            flow_token,
-            status: "Teknik bir aksaklık oluştu, lütfen daha sonra tekrar deneyin.",
-          },
-        },
-      },
+      data: { extension_message_response: { params: { flow_token, status: "error" } } }
     };
   }
 };
