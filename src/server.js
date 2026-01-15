@@ -82,10 +82,40 @@ app.post("/", async (req, res) => {
   res.send(encryptResponse(screenResponse, aesKeyBuffer, initialVectorBuffer));
 });
 
-app.get("/", (req, res) => {
-  res.send(`<pre>Nothing to see here.
-Checkout README.md to start.</pre>`);
+// =================================================================
+// DEĞİŞİKLİK BURADA BAŞLIYOR (WEBHOOK DOĞRULAMA KODU)
+// =================================================================
+
+// Meta Webhook Kurulumunda "Verify Token" alanına bunu yazacaksın:
+const WEBHOOK_VERIFY_TOKEN = "berkkush1312";
+
+app.get("/webhook", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  // Meta doğrulama isteği gönderdiyse
+  if (mode && token) {
+    if (mode === "subscribe" && token === WEBHOOK_VERIFY_TOKEN) {
+      console.log("✅ WEBHOOK_VERIFIED");
+      // Challenge kodunu geri döndürmezsen doğrulama başarısız olur!
+      res.status(200).send(challenge);
+    } else {
+      // Şifre yanlışsa 403 dön
+      console.error("❌ Webhook doğrulama hatası: Token eşleşmedi.");
+      res.sendStatus(403);
+    }
+  } else {
+    // Normal tarayıcıdan girenler için mesaj
+    res.send(`<pre>Webhook endpoint is active. 
+    Use POST / for Flow requests.
+    Use GET /webhook with hub.challenge for verification.</pre>`);
+  }
 });
+
+// =================================================================
+// DEĞİŞİKLİK BURADA BİTİYOR
+// =================================================================
 
 app.listen(PORT, () => {
   console.log(`Server is listening on port: ${PORT}`);
